@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Çizgi CAD v15.9 - Tam Sayı CM, Virgüllü MM ve CSV Formatı</title>
+<title>Çizgi CAD v16.1 - Kesin Santimetre (cm) Formatı</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1b1d1f">
 <meta name="mobile-web-app-capable" content="yes">
@@ -140,14 +140,14 @@
   <div id="canvasWrap">
     <canvas id="cv"></canvas>
     <input id="lenInput" inputmode="decimal" />
-    <div id="directInputBox"><span id="directInputLabel">Ölçü:</span> <span id="directInputVal">0</span></div>
+    <div id="directInputBox"><span id="directInputLabel">Ölçü:</span> <span id="directInputVal">0 cm</span></div>
     <div id="voiceStatus"><span>🎙️</span><span>Dinleniyor...</span></div>
     <div id="toast"></div>
   </div>
 
   <div id="statusbar">
     <span id="stMode">Mod: MDF</span>
-    <span id="stCoord">X:0 Y:0</span>
+    <span id="stCoord">X:0 Y:0 cm</span>
     <span id="stZoom">Ölçek: 100%</span>
     <span id="stInfo"></span>
   </div>
@@ -162,7 +162,7 @@
   <button class="pbtn" id="cmEditLen"><span class="ic">✏</span><span>Uzunluk Değiştir</span></button>
   <button class="pbtn" id="cmRotate"><span class="ic">🔄</span><span>90° Döndür</span></button>
   <button class="pbtn" id="cmCopy"><span class="ic">📋</span><span>Kopyala</span></button>
-  <button class="pbtn" id="cmDelete" style="color:var(--danger);"><span class="ic">🗑️</span><span>Sil</span></button>
+  <button class="pbtn" id="cmDelete" style="color:var(--danger);"><span class="ic">🗑️️</span><span>Sil</span></button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -266,33 +266,25 @@ const popover = document.getElementById('popover');
 const contextMenu = document.getElementById('contextMenu');
 const overlayClick = document.getElementById('overlayClick');
 
-// ---------- ÖZEL ÖLÇÜ FORMATLAMA FONKSİYONLARI ----------
-// Ekran Gösterimi ve Etiketler İçin:
-// mm değerini kontrol eder: Tam 10'un katı ise CM (örn: 750mm -> '75 cm'), değilse MM (örn: 75.7mm -> '75,7 mm')
+// ---------- TAM KESİN SANTİMETRE FORMATLAMA FONKSİYONLARI ----------
+// Hafızadaki mm değerini her zaman 'cm' olarak ekrana basar.
+// 1900 mm -> '190 cm'
+// 1903 mm -> '190,3 cm'
 function fmtLen(mm){
-  const roundMm = Math.round(mm * 10) / 10;
-  if(roundMm % 10 === 0){
-    return (roundMm / 10).toString() + ' cm';
-  } else {
-    return roundMm.toString().replace('.', ',') + ' mm';
-  }
+  const cmVal = Math.round(mm) / 10;
+  const strVal = cmVal.toString().replace('.', ',');
+  return strVal + ' cm';
 }
 
-// Girdi Dönüştürme Motoru:
-// '75' -> 75 cm = 750 mm
-// '75,7' veya '75.7' -> 75.7 mm
-function parseSmartInputToMm(strVal){
+// Kullanıcı Girdisini mm'ye çeviren motor:
+// '190' -> 190 cm = 1900 mm
+// '190,3' veya '190.3' -> 190.3 cm = 1903 mm
+function parseCmInputToMm(strVal){
   if(!strVal) return 0;
-  const str = strVal.toString().trim();
-  if(str.includes(',') || str.includes('.')){
-    // Virgüllü veya noktalı girildiyse doğrudan MM kabul et
-    const val = parseFloat(str.replace(',', '.'));
-    return isNaN(val) ? 0 : val;
-  } else {
-    // Tam sayı girildiyse CM kabul et ve 10 ile çarparak MM'ye çevir
-    const val = parseInt(str, 10);
-    return isNaN(val) ? 0 : val * 10;
-  }
+  const cleanStr = strVal.toString().trim().replace(',', '.');
+  const cmVal = parseFloat(cleanStr);
+  if(isNaN(cmVal)) return 0;
+  return Math.round(cmVal * 10); // Milimetre hassasiyetinde hafızaya kaydeder
 }
 
 function pushHistory(){
@@ -581,7 +573,7 @@ function startVoiceRecognition() {
     try {
       recognition.start();
       voiceStatus.classList.add('active');
-      showToast('Sesli ölçü dinleniyor (Örn: 75 veya 75 virgül 7)');
+      showToast('Sesli ölçü dinleniyor (Örn: 190 veya 190 virgül 3)');
     } catch(e) {}
   }
 }
@@ -1172,7 +1164,7 @@ function handleDrawTap(worldPt){
     if(!drawing) {
       drawing={id:'draft',type:tool,points:[worldPt]};
       directInputBox.style.display = 'block';
-      showToast(voiceControlOn ? 'Çizim başladı. Yönü verin ve ölçüyü söyleyin.' : 'Çizim kilitli noktadan başladı. Ölçüyü yazın.');
+      showToast(voiceControlOn ? 'Çizim başladı. Yönü verin ve ölçüyü söyleyin.' : 'Çizim başladı. Ölçüyü yazın (örn: 190 veya 190,3)');
     } else {
       finalizeSimpleShape(worldPt);
     }
@@ -1259,7 +1251,7 @@ function promptShapeLabel(s){
   }
 }
 
-// Klavyeden Değer Girildiğinde Akıllı Dönüştürücü İle İşleme
+// Klavyeden Santimetre Formatında Değer Yazılması
 window.addEventListener('keydown',(e)=>{
   if(e.target.tagName === 'INPUT') return;
 
@@ -1291,7 +1283,7 @@ window.addEventListener('keydown',(e)=>{
 
 function updateDirectInputUI(){
   if(directTypedLength.length > 0){
-    directInputVal.textContent = directTypedLength;
+    directInputVal.textContent = directTypedLength + " cm";
     directInputBox.style.display = 'block';
   } else if(drawing && liveWorld){
     const p0 = drawing.points[0];
@@ -1309,7 +1301,7 @@ function resetDirectInput(){
 }
 
 function commitDirectTypedLength(){
-  const mmVal = parseSmartInputToMm(directTypedLength);
+  const mmVal = parseCmInputToMm(directTypedLength);
   
   if(!isNaN(mmVal) && mmVal > 0 && drawing && liveWorld){
     const p0 = drawing.points[0];
@@ -1431,7 +1423,7 @@ function openLabelEditor(hit){
   lenInput.style.display='block';
   lenInput.style.left=hit.x+'px'; lenInput.style.top=(hit.y-30)+'px';
   lenInput.style.width=Math.max(70,hit.w)+'px';
-  lenInput.value = fmtLen(hit.mm);
+  lenInput.value = fmtLen(hit.mm).replace(' cm', '');
   lenInput.focus(); lenInput.select();
   render();
 }
@@ -1441,7 +1433,7 @@ lenInput.addEventListener('blur', commitLabelEdit);
 
 function commitLabelEdit(){
   if(!editingLabel) return;
-  const newMm = parseSmartInputToMm(lenInput.value);
+  const newMm = parseCmInputToMm(lenInput.value);
   const key = editingLabel.key;
   lenInput.style.display='none';
   editingLabel=null;
@@ -1508,9 +1500,9 @@ document.getElementById('cmEditLen').addEventListener('click', ()=>{
   closeMenu();
   if(contextMenuTarget){
     const curLenMm = contextMenuTarget.points[0].distanceTo(contextMenuTarget.points[1]);
-    const valStr = prompt("Yeni Uzunluk Değerini Giriniz (75 -> 75 cm / 75,7 -> 75,7 mm):", fmtLen(curLenMm));
+    const valStr = prompt("Yeni Uzunluk Değerini Giriniz (örn: 190 veya 190,3):", fmtLen(curLenMm).replace(' cm', ''));
     if(valStr){
-      const valMm = parseSmartInputToMm(valStr);
+      const valMm = parseCmInputToMm(valStr);
       if(valMm && valMm>0){
         pushHistory();
         applyLengthEdit(contextMenuTarget.id+':0', valMm);
@@ -1720,7 +1712,7 @@ function isEdgeClosed(pA, pB, currentMdfId){
   return false;
 }
 
-// BİREBİR İSTENEN FORMATTA CSV / EXCEL KESİM LİSTESİ AKTARIMI
+// SANTİMETRE FORMATINDA CSV / EXCEL KESİM LİSTESİ AKTARIMI
 function exportMdfCsv(){
   const mdfShapes = shapes.filter(s => s.type === 'mdf');
   if(mdfShapes.length === 0){
@@ -1728,10 +1720,10 @@ function exportMdfCsv(){
     return;
   }
 
-  const depthStr = prompt('Lütfen MDF parçaları için Derinlik Değerini giriniz (35 -> 35 cm / 35,5 -> 35,5 mm):', '35');
+  const depthStr = prompt('Lütfen MDF parçaları için Derinlik Değerini giriniz (örn: 35 veya 35,5):', '35');
   if(depthStr === null) return;
   
-  const depthMm = parseSmartInputToMm(depthStr);
+  const depthMm = parseCmInputToMm(depthStr);
   if(isNaN(depthMm) || depthMm <= 0){
     showToast('Geçersiz derinlik değeri girdiniz!');
     return;
@@ -1740,7 +1732,7 @@ function exportMdfCsv(){
   const groups = new Map();
 
   mdfShapes.forEach((s) => {
-    const lengthMm = Math.round(s.points[0].distanceTo(s.points[1]) * 10) / 10;
+    const lengthMm = Math.round(s.points[0].distanceTo(s.points[1]));
     const label = s.label || "MDF Parça";
     const note = s.note || "";
     
@@ -1775,7 +1767,7 @@ function exportMdfCsv(){
     }
   });
 
-  let csvContent = "Sıra No;Parça Adı;Adet;Boy;Derinlik;Ön Boy Bant;Arka Boy Bant;Sol Derinlik Bant;Sağ Derinlik Bant;Açıklama\n";
+  let csvContent = "Sıra No;Parça Adı;Adet;Boy (cm);Derinlik (cm);Ön Boy Bant;Arka Boy Bant;Sol Derinlik Bant;Sağ Derinlik Bant;Açıklama\n";
   
   let rowIdx = 1;
   groups.forEach((g) => {
