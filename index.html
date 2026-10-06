@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Çizgi CAD v15.5 - Zoom Düzeltmesi + APK Uyumlu Diyaloglar</title>
+<title>Çizgi CAD v15.6 - Etiket Öncelikli Hassas Yakalama ve OTRACK</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1b1d1f">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Çizgi CAD">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
   :root{
     --bg:#1b1d1f;
@@ -111,25 +111,6 @@
     opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap;
   }
   #toast.show{opacity:1;}
-
-  /* Özel diyalog (prompt/confirm yerine — paketlenmiş APK'da native prompt() çalışmıyor) */
-  #modalOverlay{
-    position:fixed;inset:0;z-index:70;display:none;
-    align-items:center;justify-content:center;
-    background:rgba(0,0,0,0.55);
-  }
-  #modalOverlay.show{display:flex;}
-  #modalBox{
-    background:var(--panel2);border:1px solid var(--line);border-radius:12px;
-    padding:16px;width:min(320px,90vw);box-shadow:0 8px 24px rgba(0,0,0,.5);
-  }
-  #modalTitle{font-weight:700;font-size:14px;color:var(--ink);margin-bottom:10px;line-height:1.4;}
-  #modalInput{
-    width:100%;background:var(--panel3);color:var(--ink);border:1px solid var(--line);
-    border-radius:8px;padding:9px 10px;font-size:14px;margin-bottom:12px;
-  }
-  #modalBtnRow{display:flex;gap:8px;}
-  #modalBtnRow .pbtn{flex:1;text-align:center;justify-content:center;}
 </style>
 </head>
 <body>
@@ -139,12 +120,9 @@
     <button class="gbtn active" id="grpDraw"><span id="grpDrawIcon">▬</span><span class="lbl">Çiz</span></button>
     <button class="gbtn" id="grpEdit"><span>✂️</span><span class="lbl">Düzenle</span></button>
     <button class="gbtn" id="btnEraser"><span>🧹</span><span class="lbl">Sil</span></button>
-    <button class="gbtn" id="btnUndo"><span>↩️</span><span class="lbl">Geri Al</span></button>
+    <button class="gbtn" id="btnUndo"><span>↩️️</span><span class="lbl">Geri Al</span></button>
     <div class="tsep"></div>
-    <button class="gbtn" id="btnPanOnly"><span>🖐️</span><span class="lbl">Gezin</span></button>
-    <div class="tsep"></div>
-    <button class="gbtn" id="btnPen"><span>✏️</span><span class="lbl">Kalem</span></button>
-    <button class="gbtn" id="btnPenStyle"><span>🎨</span><span class="lbl">Kalem Ayar</span></button>
+    <button class="gbtn" id="btnPanOnly"><span>🖐</span><span class="lbl">Gezin</span></button>
     <div class="tsep"></div>
     <button class="gbtn" id="toolDim"><span>📏</span><span class="lbl">Ölçü</span></button>
     <div class="tsep"></div>
@@ -156,13 +134,13 @@
     <div class="tsep"></div>
     <button class="gbtn" id="grpView"><span>⛶</span><span class="lbl">Görünüm</span></button>
     <button class="gbtn" id="grpFile"><span>💾</span><span class="lbl">Dosya</span></button>
-    <button class="gbtn" id="grpInput"><span id="grpInputIcon">🖊️</span><span class="lbl">Giriş</span></button>
+    <button class="gbtn" id="grpInput"><span id="grpInputIcon">🖊</span><span class="lbl">Giriş</span></button>
   </div>
 
   <div id="canvasWrap">
     <canvas id="cv"></canvas>
     <input id="lenInput" inputmode="decimal" />
-    <div id="directInputBox">Ölçü (mm): <span id="directInputVal">0</span></div>
+    <div id="directInputBox"><span id="directInputLabel">Ölçü (mm):</span> <span id="directInputVal">0</span></div>
     <div id="voiceStatus"><span>🎙️</span><span>Dinleniyor...</span></div>
     <div id="toast"></div>
   </div>
@@ -181,30 +159,17 @@
 
 <div id="contextMenu">
   <button class="pbtn" id="cmLabel"><span class="ic">🏷️</span><span>İsim / Açıklama Ver</span></button>
-  <button class="pbtn" id="cmEditLen"><span class="ic">✏️</span><span>Uzunluk Değiştir (mm)</span></button>
+  <button class="pbtn" id="cmEditLen"><span class="ic">✏</span><span>Uzunluk Değiştir (mm)</span></button>
   <button class="pbtn" id="cmRotate"><span class="ic">🔄</span><span>90° Döndür</span></button>
   <button class="pbtn" id="cmCopy"><span class="ic">📋</span><span>Kopyala</span></button>
   <button class="pbtn" id="cmDelete" style="color:var(--danger);"><span class="ic">🗑️</span><span>Sil</span></button>
 </div>
 
-<div id="modalOverlay">
-  <div id="modalBox">
-    <div id="modalTitle"></div>
-    <input id="modalInput" type="text" />
-    <div id="modalBtnRow">
-      <button id="modalCancel" class="pbtn">İptal</button>
-      <button id="modalOk" class="pbtn active">Tamam</button>
-    </div>
-  </div>
-</div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function(){
 "use strict";
 
-// ---------- GEOMETRİ & NOKTA (POINT) SINIFI ----------
 class Point {
   constructor(x, y) {
     this.x = Number(x);
@@ -240,7 +205,6 @@ const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 const wrap = document.getElementById('canvasWrap');
 
-// ---------- State ----------
 let shapes = [];
 let undoStack = []; 
 let nextId = 1;
@@ -250,7 +214,7 @@ let tool = 'mdf';
 let inputMode = 'pen';     
 let orthoOn = true;
 let snapOn = true;
-let voiceControlOn = false; // Sesli kontrol modu varsayılan KAPALI — kullanıcı dokunarak açar
+let voiceControlOn = false;
 let multiSelect = false;
 
 let snapSettings = {
@@ -275,11 +239,6 @@ let contextMenuTarget = null;
 let dragSnapshot = null;   
 let dragMoved = false;
 
-// Serbest kalem (Samsung Notes tarzı) — CAD ölçülerinden bağımsız, snap'e girmeyen karalama katmanı
-let freehandStroke = null;
-let freehandColor = '#ffffff';
-let freehandThickness = 2.2; // mm cinsinden, ölçekle birlikte büyür/küçülür
-
 let clipboard = [];
 let pasteOffset = 0;
 
@@ -293,9 +252,9 @@ let isMiddleMousePan = false;
 
 const MDF_THICKNESS = 18;
 
-// ---------- DOM ----------
 const lenInput = document.getElementById('lenInput');
 const directInputBox = document.getElementById('directInputBox');
+const directInputLabel = document.getElementById('directInputLabel');
 const directInputVal = document.getElementById('directInputVal');
 const voiceStatus = document.getElementById('voiceStatus');
 const btnVoiceToggle = document.getElementById('btnVoiceToggle');
@@ -306,61 +265,7 @@ const stZoom = document.getElementById('stZoom');
 const popover = document.getElementById('popover');
 const contextMenu = document.getElementById('contextMenu');
 const overlayClick = document.getElementById('overlayClick');
-const modalOverlay = document.getElementById('modalOverlay');
-const modalTitle = document.getElementById('modalTitle');
-const modalInput = document.getElementById('modalInput');
-const modalOk = document.getElementById('modalOk');
-const modalCancel = document.getElementById('modalCancel');
 
-// ---------- Özel diyalog kutuları (native prompt/confirm yerine) ----------
-// Paketlenmiş Android APK (TWA) içinde native prompt()/confirm() penceresi
-// görüntülenmiyor; bu yüzden aynı işi görecek kendi diyaloğumuzu çiziyoruz.
-function customPrompt(title, defaultValue){
-  return new Promise((resolve)=>{
-    modalTitle.textContent = title;
-    modalInput.style.display = 'block';
-    modalInput.value = defaultValue || '';
-    modalOverlay.classList.add('show');
-    setTimeout(()=>{ modalInput.focus(); modalInput.select(); }, 30);
-
-    function onOk(){ cleanup(modalInput.value); }
-    function onCancel(){ cleanup(null); }
-    function onKey(e){
-      if(e.key==='Enter'){ e.preventDefault(); onOk(); }
-      if(e.key==='Escape'){ e.preventDefault(); onCancel(); }
-    }
-    function cleanup(result){
-      modalOverlay.classList.remove('show');
-      modalOk.removeEventListener('click', onOk);
-      modalCancel.removeEventListener('click', onCancel);
-      modalInput.removeEventListener('keydown', onKey);
-      resolve(result);
-    }
-    modalOk.addEventListener('click', onOk);
-    modalCancel.addEventListener('click', onCancel);
-    modalInput.addEventListener('keydown', onKey);
-  });
-}
-function customConfirm(title){
-  return new Promise((resolve)=>{
-    modalTitle.textContent = title;
-    modalInput.style.display = 'none';
-    modalOverlay.classList.add('show');
-
-    function onOk(){ cleanup(true); }
-    function onCancel(){ cleanup(false); }
-    function cleanup(result){
-      modalOverlay.classList.remove('show');
-      modalOk.removeEventListener('click', onOk);
-      modalCancel.removeEventListener('click', onCancel);
-      resolve(result);
-    }
-    modalOk.addEventListener('click', onOk);
-    modalCancel.addEventListener('click', onCancel);
-  });
-}
-
-// ---------- Utility & History ----------
 function pushHistory(){
   undoStack.push(JSON.stringify(shapes));
   if(undoStack.length > 30) undoStack.shift();
@@ -406,37 +311,7 @@ function resizeCanvas(){
 }
 window.addEventListener('resize', resizeCanvas);
 
-// ---------- Persistence ----------
 const STORAGE_KEY = 'cizgi_cad_v14_data';
-const CSV_COLUMNS_KEY = 'cizgi_cad_csv_columns_v1';
-const CSV_COLUMNS_DEFAULT = [
-  {key:'seq',        label:'Sıra No',            order:1},
-  {key:'name',        label:'Parça Adı',          order:2},
-  {key:'count',       label:'Adet',               order:3},
-  {key:'length',      label:'Boy (mm)',           order:4},
-  {key:'depth',       label:'Derinlik (mm)',      order:5},
-  {key:'frontBant',   label:'Ön Boy Bant',        order:6},
-  {key:'rearBant',    label:'Arka Boy Bant',      order:7},
-  {key:'leftBant',    label:'Sol Derinlik Bant',  order:8},
-  {key:'rightBant',   label:'Sağ Derinlik Bant',  order:9},
-  {key:'note',        label:'Açıklama',           order:10}
-];
-function loadCsvColumns(){
-  try{
-    const raw = localStorage.getItem(CSV_COLUMNS_KEY);
-    if(!raw) return CSV_COLUMNS_DEFAULT.map(c=>({...c}));
-    const parsed = JSON.parse(raw);
-    return CSV_COLUMNS_DEFAULT.map(def=>{
-      const found = parsed.find(p=>p.key===def.key);
-      return found ? {key:def.key, label:(found.label||def.label), order:(found.order||def.order)} : {...def};
-    });
-  }catch(e){ return CSV_COLUMNS_DEFAULT.map(c=>({...c})); }
-}
-function saveCsvColumns(){
-  try{ localStorage.setItem(CSV_COLUMNS_KEY, JSON.stringify(csvColumns)); }catch(e){}
-}
-let csvColumns = loadCsvColumns();
-
 function save(showMsg){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify({shapes,scale,offX,offY,nextId}));
@@ -459,7 +334,6 @@ function load(){
 }
 function autosave(){ save(false); }
 
-// ---------- MDF Geometry ----------
 function getMdfCorners(p0, p1, rawCursor){
   const dx = p1.x - p0.x, dy = p1.y - p0.y;
   const len = p0.distanceTo(p1) || 1;
@@ -481,7 +355,6 @@ function getMdfCorners(p0, p1, rawCursor){
   ];
 }
 
-// ---------- Gelişmiş Snap Engine ----------
 function getSnapPoints(excludeId){
   const pts = [];
   for(const s of shapes){
@@ -511,7 +384,6 @@ function getSnapPoints(excludeId){
   return pts;
 }
 
-// ---------- Object Snap Tracking (OTRACK) — çoklu nokta & köşe kesişimi ----------
 function addTrackedPoint(p){
   for(const tp of trackedPoints){
     if(tp.distanceTo(p) < 0.01) return;
@@ -522,17 +394,16 @@ function addTrackedPoint(p){
 function clearTrackedPoints(){
   trackedPoints = [];
 }
-// Az önce bitirilen şeklin uç noktalarını izleme havuzuna ekler (temizlemek yerine),
-// böylece bir sonraki çizimde o köşeler hâlâ hizalama için kullanılabilir.
 function feedTrackedPointsFromPoints(pts){
   for(const p of pts) addTrackedPoint(p);
 }
 
+// ---------- AutoCAD OTRACK Hıza ve Etiket Çakışma Önlemeli Snap Engine ----------
 function computeSnap(worldPt, excludeId){
-  if(!snapOn) return { point: worldPt, marker: null, guides: [] };
+  if(!snapOn) return { point: worldPt, marker: null, guides: [], trackBase: null, trackDir: null, trackDist: 0 };
   
   const snapPts = getSnapPoints(excludeId);
-  const radius = 16 / scale;
+  const radius = 14 / scale;
   let best = null, minD = Infinity;
 
   for(const sp of snapPts){
@@ -548,13 +419,12 @@ function computeSnap(worldPt, excludeId){
     if(snapSettings.tracking && best.type === 'point'){
       addTrackedPoint(best.point);
     }
-    return { point: best.point, marker: best.type, guides: [] };
+    return { point: best.point, marker: best.type, guides: [], trackBase: null, trackDir: null, trackDist: 0 };
   }
 
   if(snapSettings.tracking && trackedPoints.length){
-    const tol = 12 / scale;
+    const tol = 16 / scale;
 
-    // İki noktanın izleme çizgilerinin kesiştiği hayali köşe (asıl istenen özellik)
     if(trackedPoints.length >= 2){
       for(let i=0;i<trackedPoints.length;i++){
         for(let j=0;j<trackedPoints.length;j++){
@@ -562,21 +432,30 @@ function computeSnap(worldPt, excludeId){
           const a = trackedPoints[i], b = trackedPoints[j];
           const candidate = new Point(a.x, b.y);
           if(worldPt.distanceTo(candidate) < tol){
-            return { point: candidate, marker: 'track2', guides: [a, b] };
+            return { point: candidate, marker: 'track2', guides: [a, b], trackBase: null, trackDir: null, trackDist: 0 };
           }
         }
       }
     }
 
-    // Tek nokta bazlı yatay/dikey izleme (eski davranış, her izlenen nokta için)
     for(const tp of trackedPoints){
-      const dx = Math.abs(worldPt.x - tp.x);
-      const dy = Math.abs(worldPt.y - tp.y);
-      if(dx < tol){
-        return { point: new Point(tp.x, worldPt.y), marker: 'track', guides: [tp] };
+      const dx = worldPt.x - tp.x;
+      const dy = worldPt.y - tp.y;
+      
+      if(Math.abs(dx) < tol){
+        const dirY = dy >= 0 ? 1 : -1;
+        const dir = { x: 0, y: dirY };
+        const snappedPt = new Point(tp.x, worldPt.y);
+        const dist = Math.abs(dy);
+        return { point: snappedPt, marker: 'track', guides: [tp], trackBase: tp, trackDir: dir, trackDist: dist };
       }
-      if(dy < tol){
-        return { point: new Point(worldPt.x, tp.y), marker: 'track', guides: [tp] };
+      
+      if(Math.abs(dy) < tol){
+        const dirX = dx >= 0 ? 1 : -1;
+        const dir = { x: dirX, y: 0 };
+        const snappedPt = new Point(worldPt.x, tp.y);
+        const dist = Math.abs(dx);
+        return { point: snappedPt, marker: 'track', guides: [tp], trackBase: tp, trackDir: dir, trackDist: dist };
       }
     }
   }
@@ -589,13 +468,13 @@ function computeSnap(worldPt, excludeId){
         const p1 = edges[i], p2 = edges[(i+1)%edges.length];
         const proj = worldPt.projectToSegment(p1, p2);
         if(worldPt.distanceTo(proj) < radius){
-          return { point: proj, marker: 'perp', guides: [p1, p2] };
+          return { point: proj, marker: 'perp', guides: [p1, p2], trackBase: null, trackDir: null, trackDist: 0 };
         }
       }
     }
   }
 
-  return { point: worldPt, marker: null, guides: [] };
+  return { point: worldPt, marker: null, guides: [], trackBase: null, trackDir: null, trackDist: 0 };
 }
 
 function applyOrtho(start, pt){
@@ -604,7 +483,6 @@ function applyOrtho(start, pt){
   return dx >= dy ? new Point(pt.x, start.y) : new Point(start.x, pt.y);
 }
 
-// ---------- SES TANIMA (SPEECH RECOGNITION) MOTORU ----------
 let recognition = null;
 let voiceCommitTimer = null;
 
@@ -628,7 +506,7 @@ function initVoiceRecognition() {
 
     transcript = transcript.trim().toLowerCase();
 
-    if(!drawing || (drawing.type !== 'line' && drawing.type !== 'mdf')) return;
+    if(!drawing && directTypedLength.length === 0 && !snapResult) return;
 
     const parsedNumber = parseTurkishNumber(transcript);
 
@@ -638,7 +516,7 @@ function initVoiceRecognition() {
 
       clearTimeout(voiceCommitTimer);
       voiceCommitTimer = setTimeout(() => {
-        if (drawing && directTypedLength.length > 0) {
+        if (directTypedLength.length > 0) {
           commitDirectTypedLength();
         }
       }, 350);
@@ -654,17 +532,17 @@ function initVoiceRecognition() {
     }
   };
   rec.onend = () => {
-    voiceStatus.classList.remove('active');
-    // Kasıtlı olarak otomatik yeniden başlatmıyoruz — her çizgi kendi kısa
-    // dinleme oturumunu açar/kapatır, bu da sürekli açık mikrofonun
-    // yarattığı gecikmeyi/kesikliği önler.
+    if (voiceControlOn) {
+      try { rec.start(); } catch(e){}
+    } else {
+      voiceStatus.classList.remove('active');
+    }
   };
 
   return rec;
 }
 
 function startVoiceRecognition() {
-  if (!voiceControlOn) return;
   if (!window.isSecureContext) {
     showToast('Mikrofon için sayfayı bir sunucudan (http/https) açmanız gerekiyor');
     voiceControlOn = false;
@@ -676,6 +554,7 @@ function startVoiceRecognition() {
     try {
       recognition.start();
       voiceStatus.classList.add('active');
+      showToast('Sesli ölçü dinleniyor');
     } catch(e) {}
   }
 }
@@ -688,14 +567,12 @@ function stopVoiceRecognition() {
   clearTimeout(voiceCommitTimer);
 }
 
-// Türkçe Metin Sayılarını Rakama Çevirme
 function parseTurkishNumber(str) {
   const digits = str.replace(/[^0-9]/g, '');
   if (digits.length > 0) return parseInt(digits, 10);
 
   const units = { 'sıfır':0, 'bir':1, 'iki':2, 'üç':3, 'dört':4, 'beş':5, 'altı':6, 'yedi':7, 'sekiz':8, 'dokuz':9 };
   const tens = { 'on':10, 'yirmi':20, 'otuz':30, 'kırk':40, 'elli':50, 'altmış':60, 'yetmiş':70, 'seksen':80, 'doksan':90 };
-  const hundreds = { 'yüz':100 };
 
   const words = str.split(/\s+/);
   let total = 0, current = 0;
@@ -714,7 +591,6 @@ function parseTurkishNumber(str) {
   return total > 0 ? total : null;
 }
 
-// ---------- Rendering & Visual Snapping ----------
 let labelHitboxes = [];
 
 function drawGrid(){
@@ -734,12 +610,14 @@ function drawGrid(){
   ctx.stroke();
   ctx.restore();
 }
+
 function pickGridStep(){
   const target=60; let step=10;
   while(step*scale<target) step*= (step/10===1?2.5:2);
   while(step*scale>target*4) step/=2;
   return step;
 }
+
 function normalFor(p0,p1){
   const dx=p1.x-p0.x, dy=p1.y-p0.y;
   let nx=-dy,ny=dx; const len=Math.hypot(nx,ny)||1;
@@ -748,6 +626,7 @@ function normalFor(p0,p1){
   if(nx===0&&ny===0){ nx=0; ny=-1; }
   return {x:nx,y:ny};
 }
+
 function roundRect(x,y,w,h,r){
   ctx.beginPath();
   ctx.moveTo(x+r,y);
@@ -757,19 +636,48 @@ function roundRect(x,y,w,h,r){
   ctx.arcTo(x,y,x+w,y,r);
   ctx.closePath();
 }
+
 function drawLabelBox(sx,sy,text,hitKey,mm,editable){
   ctx.font='600 12px -apple-system, sans-serif';
-  const w=ctx.measureText(text).width;
-  const boxW=w+10, boxH=18;
-  const bx=sx-boxW/2, by=sy-boxH/2;
-  ctx.fillStyle='rgba(16,18,20,0.9)';
+  const textWidth = ctx.measureText(text).width;
+  
+  const showBtn = editable !== false;
+  const btnWidth = showBtn ? 16 : 0;
+  const btnGap = showBtn ? 6 : 0;
+  
+  const boxW = textWidth + btnWidth + btnGap + 14;
+  const boxH = 20;
+  const bx = sx - boxW/2, by = sy - boxH/2;
+  
+  ctx.fillStyle = 'rgba(16,18,20,0.92)';
   ctx.strokeStyle = (editingLabel && editingLabel.key===hitKey) ? '#ffb454' : '#3a3d42';
-  ctx.lineWidth=1;
-  roundRect(bx,by,boxW,boxH,5);
+  ctx.lineWidth = 1;
+  roundRect(bx,by,boxW,boxH,6);
   ctx.fill(); ctx.stroke();
-  ctx.fillStyle='#ffb454';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(text, sx, sy+0.5);
+
+  if(showBtn){
+    const btnX = bx + 10;
+    const btnY = sy;
+    ctx.beginPath();
+    ctx.arc(btnX, btnY, 6.5, 0, Math.PI * 2);
+    ctx.strokeStyle = '#ffb454';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffb454';
+    ctx.font = 'bold 10px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('?', btnX, btnY + 0.5);
+  }
+
+  ctx.font = '600 12px -apple-system, sans-serif';
+  ctx.fillStyle = '#ffb454';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const textX = bx + (showBtn ? 22 : 7);
+  ctx.fillText(text, textX, sy + 0.5);
+
   if(editable) labelHitboxes.push({x:bx,y:by,w:boxW,h:boxH,key:hitKey,mm});
 }
 
@@ -802,22 +710,6 @@ function drawMdf(s, isSelected){
   }
 }
 
-let noteHitboxes = [];
-function drawNoteBadge(sx, sy, shapeId, hasNote){
-  const r = 8;
-  ctx.save();
-  ctx.fillStyle = hasNote ? 'rgba(255,180,84,0.25)' : 'rgba(16,18,20,0.9)';
-  ctx.strokeStyle = '#ffb454';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#ffb454';
-  ctx.font = 'bold 11px -apple-system, sans-serif';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('?', sx, sy+0.5);
-  ctx.restore();
-  noteHitboxes.push({x:sx-r-4, y:sy-r-4, w:(r+4)*2, h:(r+4)*2, shapeId});
-}
-
 function drawShape(s, isSelected){
   ctx.save();
   ctx.strokeStyle = isSelected ? '#4fa8ff' : '#e8e8e8';
@@ -843,25 +735,8 @@ function drawShape(s, isSelected){
   } else if(s.type==='mdf'){
     drawMdf(s, isSelected);
     drawLenLabel(s.points[0], s.points[1], s.points[0].distanceTo(s.points[1]), s.id+':0');
-    const s0=worldToScreen(s.points[0]), s1=worldToScreen(s.points[1]);
-    const mid={x:(s0.x+s1.x)/2,y:(s0.y+s1.y)/2};
-    const n=normalFor(s.points[0], s.points[1]);
-    drawNoteBadge(mid.x+n.x*44, mid.y+n.y*44, s.id, !!(s.note && s.note.length));
   } else if(s.type==='dim'){
     drawDimension(s, isSelected);
-  } else if(s.type==='freehand'){
-    ctx.strokeStyle = s.color || '#ffffff';
-    ctx.lineWidth = Math.max(1, (s.thickness||2) * scale);
-    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    ctx.beginPath();
-    s.points.forEach((p,i)=>{ const sp=worldToScreen(p); i===0?ctx.moveTo(sp.x,sp.y):ctx.lineTo(sp.x,sp.y); });
-    ctx.stroke();
-    if(isSelected){
-      ctx.save(); ctx.strokeStyle='#4fa8ff'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
-      ctx.beginPath();
-      s.points.forEach((p,i)=>{ const sp=worldToScreen(p); i===0?ctx.moveTo(sp.x,sp.y):ctx.lineTo(sp.x,sp.y); });
-      ctx.stroke(); ctx.restore();
-    }
   }
   ctx.restore();
 }
@@ -882,6 +757,7 @@ function dimGeometry(p0,p1,offsetSigned){
   const ext1b = new Point(dimP1.x+rnx*sign*overshoot, dimP1.y+rny*sign*overshoot);
   return { dimP0, dimP1, ext0:[ext0a,ext0b], ext1:[ext1a,ext1b] };
 }
+
 function drawArrow(tipWorld, dirWorld){
   const tip = worldToScreen(tipWorld);
   const dLen = Math.hypot(dirWorld.x,dirWorld.y)||1;
@@ -900,6 +776,7 @@ function drawArrow(tipWorld, dirWorld){
   ctx.closePath();
   ctx.fill();
 }
+
 function drawDimension(s, isSelected){
   const [p0,p1] = s.points;
   const off = s.offset;
@@ -1023,6 +900,13 @@ function drawSnapAndTrack(){
       ctx.save(); ctx.setLineDash([5, 5]); ctx.strokeStyle='#4fa8ff'; ctx.lineWidth=1.5;
       ctx.beginPath(); ctx.moveTo(tp.x, tp.y); ctx.lineTo(sp.x, sp.y); ctx.stroke(); ctx.restore();
       ctx.beginPath(); ctx.arc(sp.x, sp.y, 5, 0, Math.PI * 2); ctx.fill();
+
+      if(snapResult.trackDist > 0){
+        ctx.font = 'bold 11px -apple-system, sans-serif';
+        ctx.fillStyle = '#ffb454';
+        ctx.fillText(fmtLen(snapResult.trackDist) + ' mm', sp.x + 10, sp.y - 10);
+      }
+
     } else if(snapResult.marker==='mid'){ 
       ctx.beginPath(); ctx.moveTo(sp.x,sp.y-7); ctx.lineTo(sp.x+7,sp.y+6); ctx.lineTo(sp.x-7,sp.y+6); ctx.closePath(); ctx.stroke(); 
     } else if(snapResult.marker==='perp'){
@@ -1036,29 +920,17 @@ function drawSnapAndTrack(){
 
 function render(){
   labelHitboxes=[];
-  noteHitboxes=[];
   const r=wrap.getBoundingClientRect();
   ctx.clearRect(0,0,r.width,r.height);
   drawGrid();
   for(const s of shapes) drawShape(s, selectedShapes.has(s.id));
   drawInProgress();
-  if(freehandStroke && freehandStroke.points.length){
-    ctx.save();
-    ctx.strokeStyle = freehandStroke.color;
-    ctx.lineWidth = Math.max(1, freehandStroke.thickness * scale);
-    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    ctx.beginPath();
-    freehandStroke.points.forEach((p,i)=>{ const sp=worldToScreen(p); i===0?ctx.moveTo(sp.x,sp.y):ctx.lineTo(sp.x,sp.y); });
-    ctx.stroke();
-    ctx.restore();
-  }
   drawSnapAndTrack();
   stZoom.textContent='Ölçek: '+Math.round(scale/3*100)+'%';
   stMode.textContent = 'Mod: ' + tool.toUpperCase();
 }
 
-// ---------- Pointer & Dynamic Input ----------
-let panOnly = false; // Tek dokunuşla "Gezin" modu — açıkken hiçbir dokunuş çizim/silme/seçim yapmaz, sadece kaydırır
+let panOnly = false;
 function getPointerType(e){ return e.pointerType||'mouse'; }
 function shouldDraw(e){
   if(isMiddleMousePan) return false;
@@ -1077,7 +949,6 @@ function shouldPan(e){
   return false;
 }
 function localPos(e){ const r=wrap.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
-
 
 wrap.addEventListener('pointerdown', onPointerDown, {passive:false});
 wrap.addEventListener('pointermove', onPointerMove, {passive:false});
@@ -1118,13 +989,7 @@ function onPointerDown(e){
   const lp=localPos(e);
   pointers.set(e.pointerId,{x:lp.x,y:lp.y,type:getPointerType(e)});
 
-  const hitNote = hitTestNote(lp);
-  if(hitNote){
-    const sh = shapes.find(x=>x.id===hitNote.shapeId);
-    if(sh) promptShapeNote(sh);
-    return;
-  }
-
+  // Ölçü Etiketine Tıklama Önceliği (Sarı Kutuya Tıklanınca Snap Es Geçilir)
   const hitLabel = hitTestLabel(lp);
   if(hitLabel){ openLabelEditor(hitLabel); return; }
   closeLabelEditor();
@@ -1137,11 +1002,6 @@ function onPointerDown(e){
     const world = screenToWorld(lp);
     if(tool==='select'){ startSelectDrag(world, e); return; }
     if(tool==='eraser'){ eraseAt(world); return; }
-    if(tool==='freehand'){
-      freehandStroke = { id:'draft', type:'freehand', points:[world], color:freehandColor, thickness:freehandThickness };
-      render();
-      return;
-    }
     
     const excludeId = drawing?drawing.id:null;
     let pt = world;
@@ -1167,12 +1027,6 @@ function onPointerMove(e){
   const world = screenToWorld(lp);
   rawMouseWorld = world;
   stCoord.textContent = 'X:'+Math.round(world.x)+' Y:'+Math.round(world.y)+' mm';
-
-  if(freehandStroke){
-    freehandStroke.points.push(world);
-    render();
-    return;
-  }
 
   if(dragSnapshot){
     const dx = world.x-dragSnapshot.startWorld.x;
@@ -1200,6 +1054,7 @@ function onPointerMove(e){
 
     const liveDist = startForOrtho.distanceTo(liveWorld);
     if(directTypedLength.length === 0){
+      directInputLabel.textContent = "Çizim Ölçüsü (mm):";
       directInputVal.textContent = fmtLen(liveDist);
     }
     directInputBox.style.display = 'block';
@@ -1208,6 +1063,17 @@ function onPointerMove(e){
   } else {
     const snapped = computeSnap(world, null);
     snapResult = snapped;
+
+    if(snapResult && snapResult.marker === 'track' && snapResult.trackBase){
+      if(directTypedLength.length === 0){
+        directInputLabel.textContent = "Ofset Mesafe (mm):";
+        directInputVal.textContent = fmtLen(snapResult.trackDist);
+      }
+      directInputBox.style.display = 'block';
+    } else if(directTypedLength.length === 0){
+      directInputBox.style.display = 'none';
+    }
+
     render();
   }
 }
@@ -1221,16 +1087,6 @@ function onPointerUp(e){
   pointers.delete(e.pointerId);
   if(pointers.size<2) pinchStartDist=null;
   if(pointers.size===0 && !isMiddleMousePan) panLast=null;
-
-  if(freehandStroke){
-    if(freehandStroke.points.length >= 2){
-      pushHistory();
-      addShape({type:'freehand', points:freehandStroke.points.slice(), color:freehandStroke.color, thickness:freehandStroke.thickness});
-      autosave();
-    }
-    freehandStroke = null;
-    render();
-  }
 
   if(dragSnapshot){
     if(dragMoved){
@@ -1264,17 +1120,14 @@ function zoomAt(screenPt,factor){
   const ns=worldToScreen(world);
   offX += screenPt.x-ns.x; offY += screenPt.y-ns.y;
   render();
-  return Math.round(scale/3*100);
 }
 
-// ---------- Drawing Logic ----------
 function handleDrawTap(worldPt){
   if(tool==='line' || tool==='mdf'){
     if(!drawing) {
       drawing={id:'draft',type:tool,points:[worldPt]};
       directInputBox.style.display = 'block';
-      if(voiceControlOn) startVoiceRecognition();
-      showToast(voiceControlOn ? 'Çizim başladı. Yönü verin ve ölçüyü söyleyin.' : 'Çizim başladı. Ölçüyü yazın veya "Sesle Çiz" düğmesini açın.');
+      showToast(voiceControlOn ? 'Çizim başladı. Yönü verin ve ölçüyü söyleyin.' : 'Çizim kilitli noktadan başladı. Ölçüyü yazın.');
     } else {
       finalizeSimpleShape(worldPt);
     }
@@ -1311,10 +1164,10 @@ function handleDrawTap(worldPt){
 
 function finalizeSimpleShape(secondPt){
   const p0=drawing.points[0];
-  if(p0.distanceTo(secondPt)<0.5){ drawing=null; liveWorld=null; snapResult=null; resetDirectInput(); stopVoiceRecognition(); render(); return; }
+  if(p0.distanceTo(secondPt)<0.5){ drawing=null; liveWorld=null; snapResult=null; resetDirectInput(); render(); return; }
   pushHistory();
   addShape({type:drawing.type, points:[p0,secondPt], rawCursor: rawMouseWorld, label: '', note: ''});
-  drawing=null; liveWorld=null; snapResult=null; resetDirectInput(); feedTrackedPointsFromPoints([p0,secondPt]); stopVoiceRecognition(); autosave();
+  drawing=null; liveWorld=null; snapResult=null; resetDirectInput(); feedTrackedPointsFromPoints([p0,secondPt]); autosave();
   showToast(tool.toUpperCase() + ' tamamlandı.');
 }
 function addShape(partial){ const s={id:uid(),...partial}; shapes.push(s); return s; }
@@ -1334,18 +1187,27 @@ wrap.addEventListener('dblclick', (e)=>{
   if(drawing && drawing.type==='polyline'){ finishPolyline(); return; }
 
   const lp = localPos(e);
+  
+  // Ölçü kutusuna çift tıklandığında öncelik vermek
+  const hitLabel = hitTestLabel(lp);
+  if(hitLabel){
+    const [idStr] = hitLabel.key.split(':');
+    const s = shapes.find(sh => sh.id === parseInt(idStr, 10));
+    if(s && s.type === 'mdf') promptShapeLabel(s);
+    return;
+  }
+
   const world = screenToWorld(lp);
   const hit = hitTestShape(world);
-
   if(hit && hit.type === 'mdf'){
     promptShapeLabel(hit);
   }
 });
 
-async function promptShapeLabel(s){
-  const newLabel = await customPrompt("MDF Parça İsmini Giriniz:", s.label || "Yan Dikme");
+function promptShapeLabel(s){
+  const newLabel = prompt("MDF Parça İsmini Giriniz:", s.label || "Yan Dikme");
   if(newLabel !== null){
-    const newNote = await customPrompt("Excel Sütununda Görünecek Açıklama/Notu Giriniz:", s.note || "");
+    const newNote = prompt("Excel Sütununda Görünecek Açıklama/Notu Giriniz:", s.note || "");
     pushHistory();
     s.label = newLabel.trim();
     if(newNote !== null) s.note = newNote.trim();
@@ -1354,12 +1216,12 @@ async function promptShapeLabel(s){
   }
 }
 
-// Klavye Değer Girişi
+// AutoCAD Klavyeden Enter İle Ofset Noktasını Yakalama
 window.addEventListener('keydown',(e)=>{
   if(e.target.tagName === 'INPUT') return;
 
   if(e.key==='Enter'){
-    if(drawing && directTypedLength.length > 0){
+    if(directTypedLength.length > 0){
       commitDirectTypedLength();
       return;
     }
@@ -1367,12 +1229,12 @@ window.addEventListener('keydown',(e)=>{
   }
 
   if(e.key==='Escape'){ 
-    drawing=null; liveWorld=null; snapResult=null; dragSnapshot=null; hoverTrackPoint=null; clearTrackedPoints(); resetDirectInput(); stopVoiceRecognition(); freehandStroke=null; render(); 
+    drawing=null; liveWorld=null; snapResult=null; dragSnapshot=null; hoverTrackPoint=null; clearTrackedPoints(); resetDirectInput(); render(); 
   }
 
   if((e.ctrlKey || e.metaKey) && e.key==='z'){ undo(); }
 
-  if(drawing && (drawing.type==='line' || drawing.type==='mdf')){
+  if(drawing || (snapResult && snapResult.marker === 'track' && snapResult.trackBase)){
     if((e.key >= '0' && e.key <= '9') || e.key === '.' || e.key === ','){
       const char = e.key === ',' ? '.' : e.key;
       directTypedLength += char;
@@ -1387,9 +1249,14 @@ window.addEventListener('keydown',(e)=>{
 function updateDirectInputUI(){
   if(directTypedLength.length > 0){
     directInputVal.textContent = directTypedLength;
+    directInputBox.style.display = 'block';
   } else if(drawing && liveWorld){
     const p0 = drawing.points[0];
+    directInputLabel.textContent = "Çizim Ölçüsü (mm):";
     directInputVal.textContent = fmtLen(p0.distanceTo(liveWorld));
+  } else if(snapResult && snapResult.marker === 'track' && snapResult.trackBase){
+    directInputLabel.textContent = "Ofset Mesafe (mm):";
+    directInputVal.textContent = fmtLen(snapResult.trackDist);
   }
 }
 
@@ -1400,6 +1267,7 @@ function resetDirectInput(){
 
 function commitDirectTypedLength(){
   const mmVal = parseFloat(directTypedLength);
+  
   if(!isNaN(mmVal) && mmVal > 0 && drawing && liveWorld){
     const p0 = drawing.points[0];
     const dx = liveWorld.x - p0.x, dy = liveWorld.y - p0.y;
@@ -1409,11 +1277,21 @@ function commitDirectTypedLength(){
       p0.y + Math.sin(angle) * mmVal
     );
     finalizeSimpleShape(targetPt);
+  } 
+  else if(!isNaN(mmVal) && mmVal > 0 && !drawing && snapResult && snapResult.marker === 'track' && snapResult.trackBase && snapResult.trackDir){
+    const base = snapResult.trackBase;
+    const dir = snapResult.trackDir;
+    
+    const offsetPt = new Point(
+      base.x + dir.x * mmVal,
+      base.y + dir.y * mmVal
+    );
+    handleDrawTap(offsetPt);
   }
+
   resetDirectInput();
 }
 
-// ---------- Hit testing shapes ----------
 function hitTestShape(worldPt){
   const tol=12/scale; 
   for(let i=shapes.length-1;i>=0;i--){
@@ -1433,14 +1311,11 @@ function hitTestShape(worldPt){
     } else if(s.type==='dim'){
       const g=dimGeometry(s.points[0],s.points[1],s.offset);
       if(worldPt.distanceToSegment(g.dimP0, g.dimP1) < tol) return s;
-    } else if(s.type==='freehand'){
-      for(let j=0;j<s.points.length-1;j++) if(worldPt.distanceToSegment(s.points[j], s.points[j+1]) < tol) return s;
     }
   }
   return null;
 }
 
-// ---------- Select / Drag / Erase ----------
 function startSelectDrag(world, e){
   const hit = hitTestShape(world);
   if(hit){
@@ -1484,7 +1359,7 @@ function copySelected(){
   if(!selectedShapes.size){ showToast('Önce bir öğe seçin'); return; }
   clipboard = [...selectedShapes].map(id=>{
     const s = shapes.find(x=>x.id===id);
-    return { type:s.type, points:s.points.map(p=>new Point(p.x, p.y)), offset:s.offset, rawCursor:s.rawCursor, label:s.label, note:s.note, color:s.color, thickness:s.thickness };
+    return { type:s.type, points:s.points.map(p=>new Point(p.x, p.y)), offset:s.offset, rawCursor:s.rawCursor, label:s.label, note:s.note };
   });
   pasteOffset = 0;
   showToast('Kopyalandı ('+clipboard.length+')');
@@ -1496,7 +1371,7 @@ function pasteClipboard(){
   const newIds = new Set();
   for(const c of clipboard){
     const pts = c.points.map(p=>new Point(p.x+pasteOffset, p.y+pasteOffset));
-    const s = addShape({ type:c.type, points:pts, offset:c.offset, rawCursor:c.rawCursor, label:c.label, note:c.note, color:c.color, thickness:c.thickness });
+    const s = addShape({ type:c.type, points:pts, offset:c.offset, rawCursor:c.rawCursor, label:c.label, note:c.note });
     newIds.add(s.id);
   }
   selectedShapes = newIds;
@@ -1504,22 +1379,6 @@ function pasteClipboard(){
   showToast('Yapıştırıldı');
 }
 
-// ---------- Not ("?") düzenleme — sadece MDF parçalarında, Excel çıktısında görünür ----------
-function hitTestNote(lp){
-  for(const h of noteHitboxes) if(lp.x>=h.x && lp.x<=h.x+h.w && lp.y>=h.y && lp.y<=h.y+h.h) return h;
-  return null;
-}
-async function promptShapeNote(s){
-  const newNote = await customPrompt("Açıklama / Not (sadece Excel çıktısında görünür, çizim üzerinde görünmez):", s.note || "");
-  if(newNote !== null){
-    pushHistory();
-    s.note = newNote.trim();
-    autosave();
-    render();
-  }
-}
-
-// ---------- Label editing ----------
 function hitTestLabel(lp){
   for(const h of labelHitboxes) if(lp.x>=h.x && lp.x<=h.x+h.w && lp.y>=h.y && lp.y<=h.y+h.h) return h;
   return null;
@@ -1567,7 +1426,6 @@ function applyLengthEdit(key,newMm){
   }
 }
 
-// ---------- Popover & Context Menu ----------
 function openMenu(anchorEl, items){
   popover.innerHTML='';
   items.forEach(it=>{
@@ -1593,102 +1451,20 @@ function openMenu(anchorEl, items){
 }
 function closeMenu(){
   popover.classList.remove('show'); popover.style.display='none';
-  popover.style.width=''; popover.style.maxHeight=''; popover.style.overflowY='';
   contextMenu.classList.remove('show'); contextMenu.style.display='none';
   overlayClick.classList.remove('show');
 }
 overlayClick.addEventListener('pointerdown', closeMenu);
 
-// ---------- Excel Referans Tablo (sütun başlığı + sıra ayarı) ----------
-function openCsvColumnConfig(){
-  popover.innerHTML = '';
-  popover.style.width = 'min(340px, 92vw)';
-  popover.style.maxHeight = '70vh';
-  popover.style.overflowY = 'auto';
-
-  const title = document.createElement('div');
-  title.textContent = 'Excel Sütun Ayarları';
-  title.style.cssText = 'font-weight:700;font-size:13px;color:var(--ink);margin-bottom:6px;';
-  popover.appendChild(title);
-
-  const hint = document.createElement('div');
-  hint.textContent = 'Solda uygulamanın verisi; sağdaki kutuya kendi başlığını, ortadaki kutuya sütun sırasını yaz. Uygulamanın hafızasındaki ölçü değerleri değişmez, sadece Excel çıktısındaki başlık ve sıra değişir.';
-  hint.style.cssText = 'font-size:10.5px;color:var(--dim);margin-bottom:10px;line-height:1.4;';
-  popover.appendChild(hint);
-
-  const inputs = {};
-  csvColumns.slice().sort((a,b)=>a.order-b.order).forEach(col=>{
-    const def = CSV_COLUMNS_DEFAULT.find(d=>d.key===col.key);
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:6px;';
-
-    const nameLbl = document.createElement('div');
-    nameLbl.textContent = def.label;
-    nameLbl.style.cssText = 'flex:1;font-size:11px;color:var(--dim);';
-
-    const ordIn = document.createElement('input');
-    ordIn.type='number'; ordIn.value=col.order; ordIn.min=1; ordIn.max=csvColumns.length;
-    ordIn.style.cssText = 'width:38px;background:var(--panel3);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px;font-size:12px;text-align:center;';
-
-    const lblIn = document.createElement('input');
-    lblIn.type='text'; lblIn.value=col.label;
-    lblIn.style.cssText = 'width:110px;background:var(--panel3);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:12px;';
-
-    row.appendChild(nameLbl); row.appendChild(ordIn); row.appendChild(lblIn);
-    popover.appendChild(row);
-    inputs[col.key] = {ordIn, lblIn};
-  });
-
-  const btnRow = document.createElement('div');
-  btnRow.style.cssText = 'display:flex;gap:6px;margin-top:10px;';
-
-  const saveBtn = document.createElement('button');
-  saveBtn.textContent = 'Kaydet';
-  saveBtn.className = 'pbtn active';
-  saveBtn.style.cssText = 'flex:1;text-align:center;';
-  saveBtn.addEventListener('click', ()=>{
-    csvColumns = csvColumns.map(col=>{
-      const ip = inputs[col.key];
-      const ord = parseInt(ip.ordIn.value,10) || col.order;
-      const lbl = ip.lblIn.value.trim() || col.label;
-      return {key:col.key, label:lbl, order:ord};
-    });
-    saveCsvColumns();
-    closeMenu();
-    showToast('Excel sütun ayarları kaydedildi');
-  });
-
-  const resetBtn = document.createElement('button');
-  resetBtn.textContent = 'Varsayılan';
-  resetBtn.className = 'pbtn';
-  resetBtn.style.cssText = 'flex:1;text-align:center;';
-  resetBtn.addEventListener('click', ()=>{
-    csvColumns = CSV_COLUMNS_DEFAULT.map(c=>({...c}));
-    saveCsvColumns();
-    closeMenu();
-    showToast('Varsayılana sıfırlandı');
-  });
-
-  btnRow.appendChild(saveBtn); btnRow.appendChild(resetBtn);
-  popover.appendChild(btnRow);
-
-  popover.style.display='flex';
-  popover.classList.add('show');
-  const pw = 340;
-  popover.style.left = Math.max(6, (window.innerWidth-pw)/2) + 'px';
-  popover.style.top = '60px';
-  overlayClick.classList.add('show');
-}
-
 document.getElementById('cmLabel').addEventListener('click', ()=>{
   closeMenu();
   if(contextMenuTarget && contextMenuTarget.type==='mdf') promptShapeLabel(contextMenuTarget);
 });
-document.getElementById('cmEditLen').addEventListener('click', async ()=>{
+document.getElementById('cmEditLen').addEventListener('click', ()=>{
   closeMenu();
   if(contextMenuTarget){
     const curLen = contextMenuTarget.points[0].distanceTo(contextMenuTarget.points[1]);
-    const valStr = await customPrompt("Yeni Uzunluk Değerini Giriniz (mm):", fmtLen(curLen));
+    const valStr = prompt("Yeni Uzunluk Değerini Giriniz (mm):", fmtLen(curLen));
     if(valStr){
       const val = parseFloat(valStr.replace(',','.'));
       if(val && val>0){
@@ -1713,16 +1489,13 @@ document.getElementById('cmRotate').addEventListener('click', ()=>{
 document.getElementById('cmCopy').addEventListener('click', ()=>{ closeMenu(); copySelected(); });
 document.getElementById('cmDelete').addEventListener('click', ()=>{ closeMenu(); deleteSelected(); });
 
-// ---------- Toolbar Wiring ----------
 const drawIcons = { select:'↖', line:'╱', polyline:'⌇', rect:'▭', mdf:'▬' };
 function setTool(t){
   tool=t; drawing=null; liveWorld=null; snapResult=null; dragSnapshot=null; hoverTrackPoint=null; clearTrackedPoints(); resetDirectInput();
-  freehandStroke=null; stopVoiceRecognition();
   document.getElementById('grpDrawIcon').textContent = drawIcons[t] || '↖';
   document.getElementById('grpDraw').classList.toggle('active', ['select','line','polyline','rect','mdf'].includes(t));
   document.getElementById('toolDim').classList.toggle('active', t==='dim');
   document.getElementById('btnEraser').classList.toggle('active', t==='eraser');
-  document.getElementById('btnPen').classList.toggle('active', t==='freehand');
   showToast('Aktif Araç: ' + t.toUpperCase());
   render();
 }
@@ -1760,8 +1533,7 @@ btnVoiceToggle.addEventListener('click', ()=>{
   voiceControlOn = !voiceControlOn;
   btnVoiceToggle.classList.toggle('on', voiceControlOn);
   if(voiceControlOn){
-    showToast('Sesli Ölçü Etkin — çizgiye başlayınca mikrofon otomatik açılır, bitirince kapanır');
-    if(drawing && (drawing.type==='line' || drawing.type==='mdf')) startVoiceRecognition();
+    startVoiceRecognition();
   } else {
     stopVoiceRecognition();
     showToast('Sesli Ölçü Kapalı');
@@ -1774,67 +1546,6 @@ btnPanOnly.addEventListener('click', ()=>{
   btnPanOnly.classList.toggle('on',panOnly);
   showToast(panOnly ? 'Gezinme modu açık — dokunuşlar artık sadece kaydırır' : 'Gezinme modu kapalı');
 });
-
-document.getElementById('btnPen').addEventListener('click', ()=>setTool(tool==='freehand'?'select':'freehand'));
-
-document.getElementById('btnPenStyle').addEventListener('click', function(){
-  openPenStyleMenu(this);
-});
-
-function openPenStyleMenu(anchorEl){
-  popover.innerHTML = '';
-
-  const title = document.createElement('div');
-  title.textContent = 'Kalem Ayarları';
-  title.style.cssText = 'font-weight:700;font-size:12.5px;color:var(--ink);margin-bottom:8px;';
-  popover.appendChild(title);
-
-  const colorRow = document.createElement('div');
-  colorRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:12px;';
-  const colorLbl = document.createElement('div');
-  colorLbl.textContent = 'Renk';
-  colorLbl.style.cssText = 'font-size:12px;color:var(--dim);flex:1;';
-  const colorInput = document.createElement('input');
-  colorInput.type = 'color';
-  colorInput.value = freehandColor;
-  colorInput.style.cssText = 'width:44px;height:32px;border:1px solid var(--line);border-radius:6px;background:none;padding:0;cursor:pointer;';
-  colorInput.addEventListener('input', ()=>{ freehandColor = colorInput.value; });
-  colorRow.appendChild(colorLbl); colorRow.appendChild(colorInput);
-  popover.appendChild(colorRow);
-
-  const thickRow = document.createElement('div');
-  thickRow.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-bottom:4px;';
-  const thickLbl = document.createElement('div');
-  thickLbl.textContent = 'Kalınlık: ' + freehandThickness.toFixed(1) + ' mm';
-  thickLbl.style.cssText = 'font-size:12px;color:var(--dim);';
-  const thickInput = document.createElement('input');
-  thickInput.type = 'range'; thickInput.min='0.5'; thickInput.max='10'; thickInput.step='0.5';
-  thickInput.value = freehandThickness;
-  thickInput.style.cssText = 'width:100%;';
-  thickInput.addEventListener('input', ()=>{
-    freehandThickness = parseFloat(thickInput.value);
-    thickLbl.textContent = 'Kalınlık: ' + freehandThickness.toFixed(1) + ' mm';
-  });
-  thickRow.appendChild(thickLbl); thickRow.appendChild(thickInput);
-  popover.appendChild(thickRow);
-
-  const useBtn = document.createElement('button');
-  useBtn.className = 'pbtn active';
-  useBtn.style.cssText = 'margin-top:10px;text-align:center;';
-  useBtn.textContent = 'Kalemi Seç ve Kapat';
-  useBtn.addEventListener('click', ()=>{ setTool('freehand'); closeMenu(); });
-  popover.appendChild(useBtn);
-
-  popover.style.display='flex';
-  popover.classList.add('show');
-  const r = anchorEl.getBoundingClientRect();
-  const pw = 220;
-  let left = r.left;
-  if(left+pw > window.innerWidth-8) left = window.innerWidth-pw-8;
-  popover.style.left = Math.max(6,left)+'px';
-  popover.style.top = (r.bottom+6)+'px';
-  overlayClick.classList.add('show');
-}
 
 const btnOrtho=document.getElementById('btnOrtho');
 btnOrtho.addEventListener('click', ()=>{ orthoOn=!orthoOn; btnOrtho.classList.toggle('on',orthoOn); });
@@ -1910,18 +1621,17 @@ document.getElementById('btnSnapMenu').addEventListener('click', function(){
 document.getElementById('grpView').addEventListener('click', function(){
   openMenu(this, [
     {icon:'⛶', label:'Sığdır', onClick:fitToView},
-    {icon:'＋', label:'Yakınlaştır', keepOpen:true, onClick:()=>{ const r=wrap.getBoundingClientRect(); const pct=zoomAt({x:r.width/2,y:r.height/2},1.5); showToast('Ölçek: '+pct+'%'); }},
-    {icon:'－', label:'Uzaklaştır', keepOpen:true, onClick:()=>{ const r=wrap.getBoundingClientRect(); const pct=zoomAt({x:r.width/2,y:r.height/2},0.667); showToast('Ölçek: '+pct+'%'); }},
+    {icon:'＋', label:'Yakınlaştır', keepOpen:true, onClick:()=>{ const r=wrap.getBoundingClientRect(); zoomAt({x:r.width/2,y:r.height/2},1.25); }},
+    {icon:'－', label:'Uzaklaştır', keepOpen:true, onClick:()=>{ const r=wrap.getBoundingClientRect(); zoomAt({x:r.width/2,y:r.height/2},0.8); }},
   ]);
 });
 
 document.getElementById('grpFile').addEventListener('click', function(){
   openMenu(this, [
     {icon:'💾', label:'Kaydet', onClick:()=>save(true)},
-    {icon:'📊', label:'MDF Kesim Listesi Aktar (.xlsx)', onClick:exportMdfCsv},
-    {icon:'🗂️', label:'Excel Referans Tablo', keepOpen:true, onClick:()=>openCsvColumnConfig()},
-    {icon:'🗎', label:'Yeni', onClick: async ()=>{
-      if(shapes.length && !(await customConfirm('Yeni çizim başlatılsın mı? Kaydedilmemiş değişiklikler kaybolur.'))) return;
+    {icon:'📊', label:'MDF Kesim Listesi Aktar (.csv)', onClick:exportMdfCsv},
+    {icon:'🗎', label:'Yeni', onClick:()=>{
+      if(shapes.length && !confirm('Yeni çizim başlatılsın mı? Kaydedilmemiş değişiklikler kaybolur.')) return;
       pushHistory();
       shapes=[]; drawing=null; selectedShapes=new Set(); offX=40; offY=40; scale=3; autosave(); render();
     }},
@@ -1929,7 +1639,7 @@ document.getElementById('grpFile').addEventListener('click', function(){
   ]);
 });
 
-const inputIcons={pen:'🖊️',hand:'✋',pan:'🖐️'};
+const inputIcons={pen:'🖊️',hand:'✋',pan:'🖐'};
 document.getElementById('grpInput').addEventListener('click', function(){
   openMenu(this, [
     {icon:'🖊️', label:'Kalem (S Pen çizer)', active:inputMode==='pen', onClick:()=>setInputMode('pen')},
@@ -1951,7 +1661,6 @@ function fitToView(){
   render();
 }
 
-// ---------- Point Tabanlı Kenar Çakışma ve Bant Formülü ----------
 function isEdgeClosed(pA, pB, currentMdfId){
   const tol = 1.0; 
   for(const s of shapes){
@@ -1967,19 +1676,17 @@ function isEdgeClosed(pA, pB, currentMdfId){
   return false;
 }
 
-// ---------- Excel (.xlsx) Dışa Aktarma ----------
-async function exportMdfCsv(){
+function csvNum(mm){
+  return fmtLen(mm).replace('.', ',');
+}
+function exportMdfCsv(){
   const mdfShapes = shapes.filter(s => s.type === 'mdf');
   if(mdfShapes.length === 0){
     showToast('Çizimde MDF parçası bulunamadı!');
     return;
   }
-  if(typeof XLSX === 'undefined'){
-    showToast('Excel kütüphanesi yüklenemedi — internet bağlantısını kontrol edin.');
-    return;
-  }
 
-  const depthStr = await customPrompt('Lütfen MDF parçaları için Derinlik Değerini giriniz (mm):', '350');
+  const depthStr = prompt('Lütfen MDF parçaları için Derinlik Değerini giriniz (mm):', '350');
   if(depthStr === null) return;
   
   const depthVal = parseFloat(depthStr.replace(',', '.'));
@@ -2026,41 +1733,25 @@ async function exportMdfCsv(){
     }
   });
 
-  // Sütun sırası ve başlıkları "Excel Referans Tablo" ayarından geliyor
-  const orderedCols = csvColumns.slice().sort((a,b)=>a.order-b.order);
-
-  const rows = [];
-  rows.push(orderedCols.map(c=>c.label));
-
+  let csvContent = "Sıra No;Parça Adı;Adet;Boy (mm);Derinlik (mm);Ön Boy Bant;Arka Boy Bant;Sol Derinlik Bant;Sağ Derinlik Bant;Açıklama\n";
+  
   let rowIdx = 1;
   groups.forEach((g) => {
-    const valueMap = {
-      seq: rowIdx,
-      name: g.label,
-      count: g.count,
-      length: g.length,   // gerçek sayısal hücre — virgül/nokta sorunu kalmaz
-      depth: g.depth,     // gerçek sayısal hücre
-      frontBant: g.frontBoyBant,
-      rearBant: g.rearBoyBant,
-      leftBant: g.solDerBant,
-      rightBant: g.sagDerBant,
-      note: g.note
-    };
-    rows.push(orderedCols.map(c=>valueMap[c.key]));
+    csvContent += `${rowIdx};${g.label};${g.count};${csvNum(g.length)};${csvNum(g.depth)};${g.frontBoyBant};${g.rearBoyBant};${g.solDerBant};${g.sagDerBant};${g.note}\n`;
     rowIdx++;
   });
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  // Sütun genişliklerini içeriğe göre kabaca ayarla
-  ws['!cols'] = orderedCols.map(c => ({ wch: Math.max(10, c.label.length + 2) }));
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Kesim Listesi');
-  XLSX.writeFile(wb, `MDF_Kesim_ve_Bant_Listesi_${new Date().toISOString().slice(0,10)}.xlsx`);
-  showToast(`${groups.size} satır Excel (.xlsx) olarak aktarıldı.`);
+  const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `MDF_Kesim_ve_Bant_Listesi_${new Date().toISOString().slice(0,10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast(`${groups.size} satır kesim listesi Excel olarak aktarıldı.`);
 }
 
-// ---------- PDF Export ----------
 function exportPdf(){
   if(!shapes.length){ showToast('Çizim boş'); return; }
   const { jsPDF } = window.jspdf;
@@ -2105,7 +1796,6 @@ function exportPdf(){
   doc.save('cizgi-cad-'+new Date().toISOString().slice(0,10)+'.pdf');
 }
 
-// ---------- Init ----------
 const loaded = load();
 resizeCanvas();
 if(!loaded){ offX=40; offY=40; }
@@ -2116,7 +1806,6 @@ if(!window.isSecureContext){
   setTimeout(()=>showToast('Not: Mikrofon için bu dosyayı bir sunucudan (http/https) açmanız gerekir'), 1000);
 }
 
-// ---------- PWA: Service Worker Kaydı ----------
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('sw.js').catch(()=>{});
