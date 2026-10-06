@@ -133,7 +133,7 @@
     <button class="gbtn" id="btnVoiceToggle"><span>🎙️</span><span class="lbl">Sesle Çiz</span></button>
     <div class="tsep"></div>
     <button class="gbtn" id="grpView"><span>⛶</span><span class="lbl">Görünüm</span></button>
-    <button class="gbtn" id="grpFile"><span>💾</span><span class="lbl">Dosya</span></button>
+    <button class="gbtn" id="grpFile"><span>💾</span><span class="lbl">Dosya / CSV</span></button>
     <button class="gbtn" id="grpInput"><span id="grpInputIcon">🖊</span><span class="lbl">Giriş</span></button>
   </div>
 
@@ -266,8 +266,9 @@ const popover = document.getElementById('popover');
 const contextMenu = document.getElementById('contextMenu');
 const overlayClick = document.getElementById('overlayClick');
 
-// ---------- CM / MM DÖNÜŞÜM FONKSİYONLARI ----------
-// Ekran Gösterimi İçin: mm değerini 'cm,mm' string formatına çevirir (1507 mm -> '150,7 cm')
+// ---------- CM / MM DÖNÜŞÜM VE FORMATLAMA FONKSİYONLARI ----------
+
+// Ekran ve CSV Çıktısı İçin: mm sayısal değerini '150' veya '150,7' biçiminde string yapar
 function fmtLen(mm){
   const cmPart = Math.floor(mm / 10);
   const mmPart = Math.round(mm % 10);
@@ -278,7 +279,7 @@ function fmtLen(mm){
   }
 }
 
-// Kullanıcı Girdisi İçin: '150,7' veya '150' girdisini mm sayısal değerine dönüştürür
+// Girdi Dönüştürme: '150' -> 1500 mm (150 cm), '150,7' veya '150.7' -> 1507 mm (150 cm 7 mm)
 function parseCmInputToMm(strVal){
   if(!strVal) return 0;
   const cleanStr = strVal.toString().trim().replace(',', '.');
@@ -288,10 +289,50 @@ function parseCmInputToMm(strVal){
   let mmVal = 0;
   
   if(parts.length > 1 && parts[1].length > 0){
-    mmVal = parseInt(parts[1].charAt(0), 10) || 0; // Virgülden sonraki ilk basamağı mm alır
+    mmVal = parseInt(parts[1].charAt(0), 10) || 0; // Virgülden sonraki ilk basamak mm
   }
   
   return (cmVal * 10) + mmVal;
+}
+
+function parseTurkishVoiceInput(transcript) {
+  if (!transcript) return "";
+  let text = transcript.replace(/virgül|nokta/g, ',').replace(/\s+/g, '');
+  const match = text.match(/\d+(,\d+)?/);
+  return match ? match[0] : "";
+}
+
+// CSV Dışa Aktarma (Format: 167,3 veya 150)
+function exportToCSV() {
+  if (shapes.length === 0) {
+    showToast('Dışa aktarılacak eleman yok');
+    return;
+  }
+
+  let csvContent = "\uFEFF"; // UTF-8 BOM
+  csvContent += "ID;Tip;Etiket;Uzunluk (cm);Genişlik (mm)\n";
+
+  shapes.forEach((s, idx) => {
+    if (s.type === 'mdf' || s.type === 'line') {
+      const lenMm = s.points[0].distanceTo(s.points[1]);
+      const lenFormatted = fmtLen(lenMm); // 150 veya 167,3 şeklinde
+      const widthFormatted = s.type === 'mdf' ? MDF_THICKNESS : 0;
+      const label = s.label || `Parça ${idx + 1}`;
+      
+      csvContent += `${s.id};${s.type.toUpperCase()};"${label}";${lenFormatted};${widthFormatted}\n`;
+    }
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cizgi_cad_kesim_listesi_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('CSV dosyası indirildi');
 }
 
 function pushHistory(){
@@ -534,7 +575,6 @@ function initVoiceRecognition() {
 
     if(!drawing && directTypedLength.length === 0 && !snapResult) return;
 
-    // Sesli algılamada virgülden sonra cm/mm okuması
     const parsedStr = parseTurkishVoiceInput(transcript);
 
     if (parsedStr) {
@@ -581,6 +621,318 @@ function startVoiceRecognition() {
     try {
       recognition.start();
       voiceStatus.classList.add('active');
-      showToast('Sesli ölçü dinleniyor (Örn: 150 veya 150 virgül 7)');
+      showToast('Sesli ölçü dinleniyor (Örn: 150 veya 167,3)');
     } catch(e) {}
   }
+}
+
+function stopVoiceRecognition() {
+  if (recognition) {
+    try { recognition.stop(); } catch(e){}
+  }
+  voiceStatus.classList.remove('active');
+}
+
+function updateDirectInputUI() {
+  if (directTypedLength.length > 0) {
+    directInputBox.style.display = 'block';
+    directInputVal.textContent = directTypedLength + ' cm';
+  } else {
+    directInputBox.style.display = 'none';
+  }
+}
+
+function commitDirectTypedLength() {
+  const mmLength = parseCmInputToMm(directTypedLength);
+  const displayVal = directTypedLength;
+  directTypedLength = "";
+  updateDirectInputUI();
+
+  if (mmLength <= 0) return;
+
+  if (drawing && drawing.points.length > 0) {
+    const p0 = drawing.points[0];
+    let dir = { x: 1, y: 0 };
+
+    if (snapResult && snapResult.trackBase && snapResult.trackDir) {
+      dir = snapResult.trackDir;
+    } else if (rawMouseWorld) {
+      let pt = applyOrtho(p0, rawMouseWorld);
+      const dist = p0.distanceTo(pt);
+      if (dist > 0.001) {
+        dir = { x: (pt.x - p0.x) / dist, y: (pt.y - p0.y) / dist };
+      }
+    }
+
+    const p1 = new Point(p0.x + dir.x * mmLength, p0.y + dir.y * mmLength);
+    
+    pushHistory();
+    if (drawing.type === 'mdf') {
+      shapes.push({
+        id: uid(),
+        type: 'mdf',
+        points: [p0, p1],
+        rawCursor: rawMouseWorld || p1,
+        label: ''
+      });
+    } else if (drawing.type === 'line') {
+      shapes.push({
+        id: uid(),
+        type: 'line',
+        points: [p0, p1],
+        label: ''
+      });
+    }
+    
+    feedTrackedPointsFromPoints([p0, p1]);
+    drawing = null;
+    autosave();
+    render();
+    showToast(`Çizildi: ${displayVal} cm`);
+  }
+}
+
+// Klavyeden sayısal girdi dinleme
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  if (e.key >= '0' && e.key <= '9') {
+    directTypedLength += e.key;
+    updateDirectInputUI();
+  } else if (e.key === ',' || e.key === '.') {
+    if (!directTypedLength.includes(',')) {
+      directTypedLength += ',';
+      updateDirectInputUI();
+    }
+  } else if (e.key === 'Backspace') {
+    directTypedLength = directTypedLength.slice(0, -1);
+    updateDirectInputUI();
+  } else if (e.key === 'Enter') {
+    commitDirectTypedLength();
+  } else if (e.key === 'Escape') {
+    directTypedLength = "";
+    updateDirectInputUI();
+    drawing = null;
+    selectedShapes.clear();
+    render();
+  }
+});
+
+btnVoiceToggle.addEventListener('click', () => {
+  voiceControlOn = !voiceControlOn;
+  btnVoiceToggle.classList.toggle('on', voiceControlOn);
+  if (voiceControlOn) {
+    startVoiceRecognition();
+  } else {
+    stopVoiceRecognition();
+  }
+});
+
+document.getElementById('grpFile').addEventListener('click', () => {
+  exportToCSV();
+});
+
+function render() {
+  ctx.clearRect(0, 0, cv.width / devicePixelRatio, cv.height / devicePixelRatio);
+
+  // Çizim nesnelerini çiz
+  shapes.forEach(s => {
+    const isSel = selectedShapes.has(s.id);
+    ctx.strokeStyle = isSel ? '#ffb454' : '#4fa8ff';
+    ctx.fillStyle = isSel ? 'rgba(255, 180, 84, 0.2)' : 'rgba(79, 168, 255, 0.15)';
+    ctx.lineWidth = isSel ? 2.5 : 1.5;
+
+    if (s.type === 'mdf') {
+      const pts = getMdfCorners(s.points[0], s.points[1], s.rawCursor).map(worldToScreen);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for(let i=1; i<4; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Ölçü etiketi (Tam cm için '150', küsüratlı için '167,3')
+      const len = s.points[0].distanceTo(s.points[1]);
+      const mid = s.points[0].midpointTo(s.points[1]);
+      const sm = worldToScreen(mid);
+      ctx.fillStyle = '#e8e8e8';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText((s.label ? s.label + ' ' : '') + fmtLen(len) + ' cm', sm.x, sm.y - 6);
+    } else if (s.type === 'line') {
+      const p0 = worldToScreen(s.points[0]);
+      const p1 = worldToScreen(s.points[1]);
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.stroke();
+
+      const len = s.points[0].distanceTo(s.points[1]);
+      const mid = s.points[0].midpointTo(s.points[1]);
+      const sm = worldToScreen(mid);
+      ctx.fillStyle = '#e8e8e8';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(fmtLen(len) + ' cm', sm.x, sm.y - 6);
+    }
+  });
+
+  // Anlık Çizim / Önizleme
+  if (drawing && drawing.points.length > 0) {
+    const p0 = drawing.points[0];
+    const p1 = liveWorld || p0;
+    
+    ctx.strokeStyle = '#ffb454';
+    ctx.lineWidth = 1.5;
+
+    if (drawing.type === 'mdf') {
+      const pts = getMdfCorners(p0, p1, rawMouseWorld).map(worldToScreen);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for(let i=1; i<4; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
+      ctx.stroke();
+    } else {
+      const sp0 = worldToScreen(p0);
+      const sp1 = worldToScreen(p1);
+      ctx.beginPath();
+      ctx.moveTo(sp0.x, sp0.y);
+      ctx.lineTo(sp1.x, sp1.y);
+      ctx.stroke();
+    }
+
+    const len = p0.distanceTo(p1);
+    const sm = worldToScreen(p0.midpointTo(p1));
+    ctx.fillStyle = '#ffb454';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(fmtLen(len) + ' cm', sm.x, sm.y - 8);
+  }
+
+  // Snap İşaretçisi
+  if (snapResult && snapResult.marker) {
+    const sp = worldToScreen(snapResult.point);
+    ctx.strokeStyle = '#4fa8ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+// Tuval Etkileşimleri
+wrap.addEventListener('pointerdown', (e) => {
+  if (e.button === 1) {
+    isMiddleMousePan = true;
+    panLast = { x: e.clientX, y: e.clientY };
+    return;
+  }
+
+  const rect = wrap.getBoundingClientRect();
+  const screenPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  rawMouseWorld = screenToWorld(screenPt);
+  
+  if (tool === 'pan') {
+    panLast = { x: e.clientX, y: e.clientY };
+    return;
+  }
+
+  snapResult = computeSnap(rawMouseWorld);
+  let pt = snapResult.point;
+
+  if (drawing) {
+    pt = applyOrtho(drawing.points[0], pt);
+    pushHistory();
+    if (drawing.type === 'mdf') {
+      shapes.push({
+        id: uid(),
+        type: 'mdf',
+        points: [drawing.points[0], pt],
+        rawCursor: rawMouseWorld,
+        label: ''
+      });
+    } else {
+      shapes.push({
+        id: uid(),
+        type: 'line',
+        points: [drawing.points[0], pt],
+        label: ''
+      });
+    }
+    feedTrackedPointsFromPoints([drawing.points[0], pt]);
+    drawing = null;
+    autosave();
+    render();
+  } else {
+    drawing = { type: tool === 'select' ? 'mdf' : tool, points: [pt] };
+  }
+});
+
+wrap.addEventListener('pointermove', (e) => {
+  if (isMiddleMousePan || (tool === 'pan' && panLast)) {
+    offX += e.clientX - panLast.x;
+    offY += e.clientY - panLast.y;
+    panLast = { x: e.clientX, y: e.clientY };
+    render();
+    return;
+  }
+
+  const rect = wrap.getBoundingClientRect();
+  const screenPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  rawMouseWorld = screenToWorld(screenPt);
+
+  stCoord.textContent = `X:${fmtLen(rawMouseWorld.x * 10)} Y:${fmtLen(rawMouseWorld.y * 10)} cm`;
+
+  if (drawing) {
+    snapResult = computeSnap(rawMouseWorld);
+    liveWorld = applyOrtho(drawing.points[0], snapResult.point);
+  } else {
+    snapResult = computeSnap(rawMouseWorld);
+  }
+
+  render();
+});
+
+wrap.addEventListener('pointerup', (e) => {
+  if (e.button === 1) isMiddleMousePan = false;
+  if (tool === 'pan') panLast = null;
+});
+
+wrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+  const rect = wrap.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  offX = mouseX - (mouseX - offX) * zoomFactor;
+  offY = mouseY - (mouseY - offY) * zoomFactor;
+  scale *= zoomFactor;
+
+  stZoom.textContent = `Ölçek: ${Math.round(scale * 33.3)}%`;
+  render();
+}, { passive: false });
+
+// Topbar Buton Kontrolleri
+document.getElementById('grpDraw').addEventListener('click', () => { tool = 'mdf'; stMode.textContent = 'Mod: MDF'; });
+document.getElementById('toolDim').addEventListener('click', () => { tool = 'line'; stMode.textContent = 'Mod: Çizgi'; });
+document.getElementById('btnPanOnly').addEventListener('click', () => { tool = 'pan'; stMode.textContent = 'Mod: Gezin'; });
+document.getElementById('btnUndo').addEventListener('click', undo);
+document.getElementById('btnOrtho').addEventListener('click', (e) => {
+  orthoOn = !orthoOn;
+  e.currentTarget.classList.toggle('on', orthoOn);
+});
+document.getElementById('btnSnap').addEventListener('click', (e) => {
+  snapOn = !snapOn;
+  e.currentTarget.classList.toggle('on', snapOn);
+});
+
+// Başlangıç Ayarları
+resizeCanvas();
+load();
+render();
+
+})();
+</script>
+</body>
+</html>
