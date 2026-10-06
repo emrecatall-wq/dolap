@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Çizgi CAD v16.1 - Kesin Santimetre (cm) Formatı</title>
+<title>Çizgi CAD v16.2 - Temiz CSV ve Hayalet Parça Temizliği</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1b1d1f">
 <meta name="mobile-web-app-capable" content="yes">
@@ -162,7 +162,7 @@
   <button class="pbtn" id="cmEditLen"><span class="ic">✏</span><span>Uzunluk Değiştir</span></button>
   <button class="pbtn" id="cmRotate"><span class="ic">🔄</span><span>90° Döndür</span></button>
   <button class="pbtn" id="cmCopy"><span class="ic">📋</span><span>Kopyala</span></button>
-  <button class="pbtn" id="cmDelete" style="color:var(--danger);"><span class="ic">🗑️️</span><span>Sil</span></button>
+  <button class="pbtn" id="cmDelete" style="color:var(--danger);"><span class="ic">🗑</span><span>Sil</span></button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -266,25 +266,26 @@ const popover = document.getElementById('popover');
 const contextMenu = document.getElementById('contextMenu');
 const overlayClick = document.getElementById('overlayClick');
 
-// ---------- TAM KESİN SANTİMETRE FORMATLAMA FONKSİYONLARI ----------
-// Hafızadaki mm değerini her zaman 'cm' olarak ekrana basar.
-// 1900 mm -> '190 cm'
-// 1903 mm -> '190,3 cm'
+// ---------- EKRAN GÖSTERİMİ FONKSİYONLARI ----------
 function fmtLen(mm){
   const cmVal = Math.round(mm) / 10;
   const strVal = cmVal.toString().replace('.', ',');
   return strVal + ' cm';
 }
 
-// Kullanıcı Girdisini mm'ye çeviren motor:
-// '190' -> 190 cm = 1900 mm
-// '190,3' veya '190.3' -> 190.3 cm = 1903 mm
+// ---------- TEMİZ YALIN SAYI FORMATI (CSV İÇİN) ----------
+// CSV hücresine basarken sonundaki ' cm' yazısını temizler, sadece yalın sayı bırakır (örn: 201,4)
+function fmtLenPlain(mm){
+  const cmVal = Math.round(mm) / 10;
+  return cmVal.toString().replace('.', ',');
+}
+
 function parseCmInputToMm(strVal){
   if(!strVal) return 0;
   const cleanStr = strVal.toString().trim().replace(',', '.');
   const cmVal = parseFloat(cleanStr);
   if(isNaN(cmVal)) return 0;
-  return Math.round(cmVal * 10); // Milimetre hassasiyetinde hafızaya kaydeder
+  return Math.round(cmVal * 10);
 }
 
 function pushHistory(){
@@ -1423,7 +1424,7 @@ function openLabelEditor(hit){
   lenInput.style.display='block';
   lenInput.style.left=hit.x+'px'; lenInput.style.top=(hit.y-30)+'px';
   lenInput.style.width=Math.max(70,hit.w)+'px';
-  lenInput.value = fmtLen(hit.mm).replace(' cm', '');
+  lenInput.value = fmtLenPlain(hit.mm);
   lenInput.focus(); lenInput.select();
   render();
 }
@@ -1500,7 +1501,7 @@ document.getElementById('cmEditLen').addEventListener('click', ()=>{
   closeMenu();
   if(contextMenuTarget){
     const curLenMm = contextMenuTarget.points[0].distanceTo(contextMenuTarget.points[1]);
-    const valStr = prompt("Yeni Uzunluk Değerini Giriniz (örn: 190 veya 190,3):", fmtLen(curLenMm).replace(' cm', ''));
+    const valStr = prompt("Yeni Uzunluk Değerini Giriniz (örn: 190 veya 190,3):", fmtLenPlain(curLenMm));
     if(valStr){
       const valMm = parseCmInputToMm(valStr);
       if(valMm && valMm>0){
@@ -1697,9 +1698,9 @@ function fitToView(){
   render();
 }
 
-function isEdgeClosed(pA, pB, currentMdfId){
+function isEdgeClosed(pA, pB, currentMdfId, activeShapes){
   const tol = 1.0; 
-  for(const s of shapes){
+  for(const s of activeShapes){
     if(s.type !== 'mdf' || s.id === currentMdfId) continue;
     const corners = getMdfCorners(s.points[0], s.points[1], s.rawCursor);
     for(let i=0; i<4; i++){
@@ -1712,15 +1713,16 @@ function isEdgeClosed(pA, pB, currentMdfId){
   return false;
 }
 
-// SANTİMETRE FORMATINDA CSV / EXCEL KESİM LİSTESİ AKTARIMI
+// SANTİMETRE FORMATINDA TEMİZ SAYISAL CSV / EXCEL KESİM LİSTESİ AKTARIMI
 function exportMdfCsv(){
-  const mdfShapes = shapes.filter(s => s.type === 'mdf');
+  // Sadece ekranda geçerli/aktif olan MDF parçalarını filtreler (Hayalet parçaları temizler)
+  const mdfShapes = shapes.filter(s => s.type === 'mdf' && s.points && s.points.length >= 2);
   if(mdfShapes.length === 0){
-    showToast('Çizimde MDF parçası bulunamadı!');
+    showToast('Çizimde aktif MDF parçası bulunamadı!');
     return;
   }
 
-  const depthStr = prompt('Lütfen MDF parçaları için Derinlik Değerini giriniz (örn: 35 veya 35,5):', '35');
+  const depthStr = prompt('Lütfen MDF parçaları için Derinlik Değerini giriniz (örn: 63):', '63');
   if(depthStr === null) return;
   
   const depthMm = parseCmInputToMm(depthStr);
@@ -1738,9 +1740,10 @@ function exportMdfCsv(){
     
     const corners = getMdfCorners(s.points[0], s.points[1], s.rawCursor);
     
-    const boyFrontClosed = isEdgeClosed(corners[0], corners[1], s.id);
-    const derSolClosed = isEdgeClosed(corners[3], corners[0], s.id);
-    const derSagClosed = isEdgeClosed(corners[1], corners[2], s.id);
+    // Kenar kapatma/bantlama kontrolünü sadece aktif parçalar üzerinde yürütür
+    const boyFrontClosed = isEdgeClosed(corners[0], corners[1], s.id, mdfShapes);
+    const derSolClosed = isEdgeClosed(corners[3], corners[0], s.id, mdfShapes);
+    const derSagClosed = isEdgeClosed(corners[1], corners[2], s.id, mdfShapes);
 
     const frontBoyBant = boyFrontClosed ? "" : "1";
     const rearBoyBant = ""; 
@@ -1771,8 +1774,9 @@ function exportMdfCsv(){
   
   let rowIdx = 1;
   groups.forEach((g) => {
-    const boyFormatted = fmtLen(g.lengthMm);
-    const derFormatted = fmtLen(g.depthMm);
+    // Hücre içerisindeki "cm" eklerini kaldırır, sadece yalın sayı formatı basar (örn: 201,4 ve 63)
+    const boyFormatted = fmtLenPlain(g.lengthMm);
+    const derFormatted = fmtLenPlain(g.depthMm);
     csvContent += `${rowIdx};${g.label};${g.count};${boyFormatted};${derFormatted};${g.frontBoyBant};${g.rearBoyBant};${g.solDerBant};${g.sagDerBant};${g.note}\n`;
     rowIdx++;
   });
